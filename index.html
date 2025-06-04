@@ -210,19 +210,6 @@
     <div id="audioControls">
         <button id="muteBtn">🔊 Mute</button>
     </div>
-    
-    <!-- Left Mobile Controls -->
-    <div id="leftControls">
-        <div class="control-row">
-            <div class="mobile-control" data-key="ArrowUp">↑</div>
-        </div>
-        <div class="control-row">
-            <div class="mobile-control" data-key="ArrowLeft">←</div>
-            <div class="mobile-control" data-key="ArrowDown">↓</div>
-            <div class="mobile-control" data-key="ArrowRight">→</div>
-        </div>
-    </div>
-    
     <!-- Right Mobile Controls -->
     <div id="mobileControls">
         <div class="control-row">
@@ -467,6 +454,8 @@
         });
 
         // Game state
+        let shieldItems = [];
+        let lastShieldSpawnTime = 0;
         let score = 0;
         let lives = 3;
         let level = 1;
@@ -479,21 +468,14 @@
         let bosses = [];
         let lastEnemySpawn = 0;
         let lastLifeItemSpawn = 0;
-        let enemySpawnInterval = 2000; // 더 느리게 시작 (2초)
-        let lifeItemSpawnInterval = 15000; // 15초로 단축
+        let enemySpawnInterval = 2000;
+        let lifeItemSpawnInterval = 15000;
         let invulnerable = false;
         let invulnerableTime = 0;
         let gameStartTime = 0;
         let highScore = 0;
         let bossActive = false;
         let bossStartTime = 0;
-        
-        // Load high score safely
-        try {
-            highScore = parseInt(localStorage.getItem('mahamanHighScore') || '0');
-        } catch (e) {
-            highScore = 0;
-        }
 
         // Player properties
         const player = {
@@ -639,10 +621,10 @@
                 this.x = canvas.width / 2 - this.width / 2;
                 this.y = -this.height;
                 this.speed = 2;
-                this.health = 1; // One hit kill for player still
+                this.health = 1;
                 this.moveTimer = 0;
                 this.bulletTimer = 0;
-                this.bulletInterval = 100; // Shoots every 0.1 seconds!
+                this.bulletInterval = 100;
                 this.angle = 0;
                 this.phase = 0;
                 this.specialAttackTimer = 0;
@@ -654,25 +636,19 @@
                 this.angle += 0.05;
                 this.pulseScale = 1 + Math.sin(this.moveTimer * 3) * 0.2;
                 
-                // Move down initially, then hover
                 if (this.y < 50) {
                     this.y += this.speed;
                 } else {
-                    // Aggressive movement pattern
                     this.x += Math.sin(this.moveTimer * 2) * 3;
                     this.y = 50 + Math.sin(this.moveTimer * 1.5) * 20;
-                    
-                    // Keep within bounds
                     this.x = Math.max(0, Math.min(canvas.width - this.width, this.x));
                 }
                 
-                // EXTREME bullet spam
                 if (Date.now() - this.bulletTimer > this.bulletInterval) {
                     this.extremeAttack();
                     this.bulletTimer = Date.now();
                 }
                 
-                // Special attacks every 0.5 seconds
                 if (Date.now() - this.specialAttackTimer > 500) {
                     this.specialAttack();
                     this.specialAttackTimer = Date.now();
@@ -685,13 +661,11 @@
                 const centerX = this.x + this.width / 2;
                 const centerY = this.y + this.height;
                 
-                // Pattern 1: Spiral of death (16 bullets)
                 for (let i = 0; i < 16; i++) {
                     const angle = (i / 16) * Math.PI * 2 + this.moveTimer;
                     bullets.push(new Bullet(centerX, centerY, 4, angle));
                 }
                 
-                // Pattern 2: Direct player targeting (5 bullets spread)
                 const angleToPlayer = Math.atan2(
                     player.y + player.height/2 - centerY,
                     player.x + player.width/2 - centerX
@@ -707,14 +681,14 @@
                 const centerY = this.y + this.height;
                 
                 switch(this.phase) {
-                    case 0: // Wall of bullets
+                    case 0:
                         for (let i = 0; i < 8; i++) {
                             const x = (canvas.width / 8) * i + (canvas.width / 16);
                             bullets.push(new Bullet(x, this.y, 3, Math.PI / 2));
                         }
                         break;
                         
-                    case 1: // Cross pattern
+                    case 1:
                         for (let i = 0; i < 4; i++) {
                             const angle = (i / 4) * Math.PI * 2;
                             for (let j = 0; j < 3; j++) {
@@ -723,14 +697,14 @@
                         }
                         break;
                         
-                    case 2: // Shotgun blast
+                    case 2:
                         for (let i = 0; i < 12; i++) {
                             const angle = Math.PI / 2 + (Math.random() - 0.5) * 1.5;
                             bullets.push(new Bullet(centerX, centerY, 4 + Math.random() * 2, angle));
                         }
                         break;
                         
-                    case 3: // Laser sweep
+                    case 3:
                         for (let i = 0; i < 20; i++) {
                             const angle = Math.PI / 3 + (i / 20) * (Math.PI / 3);
                             bullets.push(new Bullet(centerX, centerY, 6, angle));
@@ -745,18 +719,15 @@
                 ctx.scale(this.pulseScale, this.pulseScale);
                 ctx.rotate(this.angle);
                 
-                // Boss body - menacing design
                 ctx.fillStyle = '#660000';
                 ctx.fillRect(-this.width/2, -this.height/2, this.width, this.height);
                 
-                // Aggressive red glow
                 ctx.shadowColor = '#ff0000';
                 ctx.shadowBlur = 20;
                 ctx.strokeStyle = '#ff0000';
                 ctx.lineWidth = 4;
                 ctx.strokeRect(-this.width/2, -this.height/2, this.width, this.height);
                 
-                // Multiple eyes (menacing)
                 ctx.fillStyle = '#ff0000';
                 for (let i = 0; i < 6; i++) {
                     const eyeX = -40 + (i % 3) * 40;
@@ -765,7 +736,6 @@
                     ctx.arc(eyeX, eyeY, 6, 0, Math.PI * 2);
                     ctx.fill();
                     
-                    // Glowing centers
                     ctx.fillStyle = '#ffff00';
                     ctx.beginPath();
                     ctx.arc(eyeX, eyeY, 2, 0, Math.PI * 2);
@@ -773,7 +743,6 @@
                     ctx.fillStyle = '#ff0000';
                 }
                 
-                // Warning spikes
                 ctx.fillStyle = '#aa0000';
                 for (let i = 0; i < 8; i++) {
                     const spikeAngle = (i / 8) * Math.PI * 2;
@@ -790,7 +759,6 @@
                 
                 ctx.restore();
                 
-                // Boss health bar (dramatic)
                 const barWidth = canvas.width - 40;
                 const barHeight = 8;
                 const barX = 20;
@@ -802,13 +770,134 @@
                 ctx.lineWidth = 2;
                 ctx.strokeRect(barX, barY, barWidth, barHeight);
                 
-                // Boss warning text
                 ctx.fillStyle = '#ff0000';
                 ctx.font = 'bold 16px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText('⚠️ BOSS WARNING ⚠️', canvas.width / 2, barY + 25);
             }
         }
+
+        // Shield Item class
+        class ShieldItem {
+            constructor() {
+                this.width = 35;
+                this.height = 40;
+                this.x = Math.random() * (canvas.width - this.width);
+                this.y = -this.height;
+                this.speed = 1.8;
+                this.angle = 0;
+                this.pulse = 0;
+                this.glowIntensity = 0;
+                this.sparkles = [];
+                
+                // Create sparkles around shield
+                for (let i = 0; i < 6; i++) {
+                    this.sparkles.push({
+                        angle: (i / 6) * Math.PI * 2,
+                        distance: 25 + Math.random() * 10,
+                        speed: 0.04 + Math.random() * 0.02,
+                        size: 1 + Math.random() * 1.5
+                    });
+                }
+            }
+
+            update() {
+                this.y += this.speed;
+                this.angle += 0.05;
+                this.pulse += 0.1;
+                this.glowIntensity = 0.5 + Math.sin(this.pulse * 2) * 0.3;
+                
+                // Update sparkles
+                this.sparkles.forEach(sparkle => {
+                    sparkle.angle += sparkle.speed;
+                });
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x + this.width/2, this.y + this.height/2);
+                
+                // Draw sparkles around shield
+                this.sparkles.forEach((sparkle, index) => {
+                    const sparkleX = Math.cos(sparkle.angle) * sparkle.distance;
+                    const sparkleY = Math.sin(sparkle.angle) * sparkle.distance;
+                    const alpha = (Math.sin(this.pulse + index) * 0.3 + 0.7);
+                    
+                    ctx.save();
+                    ctx.translate(sparkleX, sparkleY);
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = '#00ffff';
+                    
+                    // Draw diamond sparkle
+                    ctx.beginPath();
+                    ctx.moveTo(0, -sparkle.size);
+                    ctx.lineTo(sparkle.size, 0);
+                    ctx.lineTo(0, sparkle.size);
+                    ctx.lineTo(-sparkle.size, 0);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                });
+                
+                // Outer glow
+                ctx.shadowColor = '#00ffff';
+                ctx.shadowBlur = 15 * this.glowIntensity;
+                
+                // Main shield shape (medieval style)
+                const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 20);
+                gradient.addColorStop(0, '#88ffff');
+                gradient.addColorStop(0.7, '#00aaff');
+                gradient.addColorStop(1, '#0066aa');
+                ctx.fillStyle = gradient;
+                
+                // Shield main body
+                ctx.beginPath();
+                ctx.moveTo(0, -18);           // Top center
+                ctx.bezierCurveTo(-12, -18, -15, -10, -15, 0);  // Left curve
+                ctx.bezierCurveTo(-15, 8, -10, 15, 0, 20);      // Bottom point
+                ctx.bezierCurveTo(10, 15, 15, 8, 15, 0);        // Right curve
+                ctx.bezierCurveTo(15, -10, 12, -18, 0, -18);    // Top curve
+                ctx.fill();
+                
+                // Shield border
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Inner decoration (cross pattern)
+                ctx.fillStyle = '#ffffff';
+                ctx.globalAlpha = 0.8;
+                
+                // Vertical line
+                ctx.fillRect(-1.5, -12, 3, 24);
+                
+                // Horizontal line
+                ctx.fillRect(-8, -1.5, 16, 3);
+                
+                // Shield emblem (small circle in center)
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = '#ffff00';
+                ctx.beginPath();
+                ctx.arc(0, 0, 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Energy waves around shield
+                ctx.globalAlpha = 0.3;
+                ctx.strokeStyle = '#00ffff';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < 3; i++) {
+                    const waveRadius = 25 + i * 8 + Math.sin(this.pulse + i) * 3;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, waveRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+            }
+        }
+
+        // Life Item class
         class LifeItem {
             constructor() {
                 this.width = 35;
@@ -821,7 +910,6 @@
                 this.bounce = 0;
                 this.sparkles = [];
                 
-                // Create sparkles around the heart
                 for (let i = 0; i < 8; i++) {
                     this.sparkles.push({
                         angle: (i / 8) * Math.PI * 2,
@@ -838,7 +926,6 @@
                 this.pulse += 0.15;
                 this.bounce += 0.2;
                 
-                // Update sparkles
                 this.sparkles.forEach(sparkle => {
                     sparkle.angle += sparkle.speed;
                 });
@@ -848,7 +935,6 @@
                 ctx.save();
                 ctx.translate(this.x + this.width/2, this.y + this.height/2);
                 
-                // Draw sparkles around the heart
                 this.sparkles.forEach((sparkle, index) => {
                     const sparkleX = Math.cos(sparkle.angle) * sparkle.distance;
                     const sparkleY = Math.sin(sparkle.angle) * sparkle.distance;
@@ -859,7 +945,6 @@
                     ctx.globalAlpha = alpha;
                     ctx.fillStyle = '#ffeb3b';
                     
-                    // Draw star sparkle
                     ctx.beginPath();
                     for (let i = 0; i < 4; i++) {
                         const angle = (i / 4) * Math.PI * 2;
@@ -873,29 +958,23 @@
                     ctx.restore();
                 });
                 
-                // Bouncing and pulsing effect
                 const bounceOffset = Math.sin(this.bounce) * 3;
                 const scale = 1 + Math.sin(this.pulse) * 0.2;
                 ctx.translate(0, bounceOffset);
                 ctx.scale(scale, scale);
                 
-                // Outer glow
                 ctx.shadowColor = '#ff69b4';
                 ctx.shadowBlur = 20;
                 
-                // Main heart body (larger and more rounded)
                 ctx.fillStyle = '#ff1493';
                 ctx.beginPath();
                 ctx.moveTo(0, -6);
-                // Left heart bump
                 ctx.bezierCurveTo(-12, -20, -30, -12, -18, 4);
                 ctx.bezierCurveTo(-18, 12, 0, 20, 0, 20);
-                // Right heart bump  
                 ctx.bezierCurveTo(0, 20, 18, 12, 18, 4);
                 ctx.bezierCurveTo(30, -12, 12, -20, 0, -6);
                 ctx.fill();
                 
-                // Inner heart highlight
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = '#ff69b4';
                 ctx.beginPath();
@@ -906,7 +985,6 @@
                 ctx.bezierCurveTo(20, -8, 8, -14, 0, -4);
                 ctx.fill();
                 
-                // Cute eyes
                 ctx.fillStyle = '#000';
                 ctx.beginPath();
                 ctx.arc(-6, -2, 2, 0, Math.PI * 2);
@@ -915,7 +993,6 @@
                 ctx.arc(6, -2, 2, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Eye highlights (makes them sparkly)
                 ctx.fillStyle = '#fff';
                 ctx.beginPath();
                 ctx.arc(-5, -3, 1, 0, Math.PI * 2);
@@ -924,14 +1001,12 @@
                 ctx.arc(7, -3, 1, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Cute smile
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 1.5;
                 ctx.beginPath();
                 ctx.arc(0, 2, 4, 0.2, Math.PI - 0.2);
                 ctx.stroke();
                 
-                // Cheek blush
                 ctx.fillStyle = 'rgba(255, 192, 203, 0.6)';
                 ctx.beginPath();
                 ctx.arc(-10, 1, 3, 0, Math.PI * 2);
@@ -940,13 +1015,11 @@
                 ctx.arc(10, 1, 3, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Extra shine effect
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
                 ctx.beginPath();
                 ctx.ellipse(-4, -8, 3, 6, -0.3, 0, Math.PI * 2);
                 ctx.fill();
                 
-                // Floating hearts around (mini hearts)
                 for (let i = 0; i < 3; i++) {
                     const miniHeartAngle = this.pulse + (i * Math.PI * 2 / 3);
                     const miniX = Math.cos(miniHeartAngle) * (25 + i * 5);
@@ -959,7 +1032,6 @@
                     ctx.globalAlpha = 0.7;
                     ctx.fillStyle = '#ffb6c1';
                     
-                    // Mini heart
                     ctx.beginPath();
                     ctx.moveTo(0, -2);
                     ctx.bezierCurveTo(-4, -8, -12, -4, -6, 2);
@@ -983,18 +1055,17 @@
                 this.y = -this.height;
                 this.speed = 1 + Math.random() * 2;
                 this.bulletTimer = 0;
-                this.bulletInterval = 1200 + Math.random() * 800;
+                this.bulletInterval = 2000 + Math.random() * 1500;
                 this.angle = 0;
                 this.type = type;
                 this.health = 1;
                 this.moveTimer = 0;
                 this.originalX = this.x;
                 
-                // Special properties based on type
                 switch(type) {
                     case 'zigzag':
                         this.speed = 1.5;
-                        this.bulletInterval = 1000;
+                        this.bulletInterval = 1500;
                         this.moveDirection = 1;
                         this.zigzagSpeed = 2;
                         break;
@@ -1003,7 +1074,7 @@
                         this.height = 50;
                         this.speed = 0.8;
                         this.health = 3;
-                        this.bulletInterval = 800;
+                        this.bulletInterval = 1600;
                         break;
                     case 'speedy':
                         this.speed = 3 + Math.random() * 2;
@@ -1013,7 +1084,7 @@
                         break;
                     case 'spiral':
                         this.speed = 1.2;
-                        this.bulletInterval = 600;
+                        this.bulletInterval = 1200;
                         this.spiralAngle = 0;
                         break;
                 }
@@ -1022,19 +1093,16 @@
             update() {
                 this.moveTimer += 0.1;
                 
-                // Movement patterns based on type
                 switch(this.type) {
                     case 'zigzag':
                         this.y += this.speed;
                         this.x += Math.sin(this.moveTimer) * this.zigzagSpeed;
-                        // Keep within bounds
                         if (this.x < 0 || this.x > canvas.width - this.width) {
                             this.x = Math.max(0, Math.min(canvas.width - this.width, this.x));
                         }
                         break;
                     case 'tank':
                         this.y += this.speed;
-                        // Slow side-to-side movement
                         this.x += Math.sin(this.moveTimer * 0.5) * 0.5;
                         break;
                     case 'speedy':
@@ -1044,19 +1112,17 @@
                         this.y += this.speed;
                         this.spiralAngle += 0.1;
                         this.x += Math.cos(this.spiralAngle) * 1.5;
-                        // Keep within bounds
                         if (this.x < 0 || this.x > canvas.width - this.width) {
                             this.x = Math.max(0, Math.min(canvas.width - this.width, this.x));
                         }
                         break;
-                    default: // basic
+                    default:
                         this.y += this.speed;
                         break;
                 }
                 
                 this.angle += 0.1;
                 
-                // Shoot bullets
                 if (Date.now() - this.bulletTimer > this.bulletInterval) {
                     this.shoot();
                     this.bulletTimer = Date.now();
@@ -1072,42 +1138,38 @@
                 
                 switch(this.type) {
                     case 'basic':
-                        bullets.push(new Bullet(this.x + this.width/2, this.y + this.height, 2.5, angleToPlayer)); // 느리게
+                        bullets.push(new Bullet(this.x + this.width/2, this.y + this.height, 2.5, angleToPlayer));
                         break;
                     case 'zigzag':
-                        // Shoots 3 bullets in a spread
                         for (let i = -1; i <= 1; i++) {
                             bullets.push(new Bullet(
                                 this.x + this.width/2, 
                                 this.y + this.height, 
-                                2.5, // 느리게
-                                angleToPlayer + i * 0.2 // 좁은 각도
+                                2.5,
+                                angleToPlayer + i * 0.2
                             ));
                         }
                         break;
                     case 'tank':
-                        // Shoots 3 bullets instead of 5
                         for (let i = -1; i <= 1; i++) {
                             bullets.push(new Bullet(
                                 this.x + this.width/2, 
                                 this.y + this.height, 
-                                2, // 더 느리게
+                                2,
                                 angleToPlayer + i * 0.3
                             ));
                         }
                         break;
                     case 'speedy':
-                        // Fast single bullet
-                        bullets.push(new Bullet(this.x + this.width/2, this.y + this.height, 3.5, angleToPlayer)); // 조금 느리게
+                        bullets.push(new Bullet(this.x + this.width/2, this.y + this.height, 3.5, angleToPlayer));
                         break;
                     case 'spiral':
-                        // Shoots in 3 directions instead of 4
                         for (let i = 0; i < 3; i++) {
                             const angle = (i * Math.PI * 2 / 3) + this.spiralAngle;
                             bullets.push(new Bullet(
                                 this.x + this.width/2, 
                                 this.y + this.height/2, 
-                                2, // 느리게
+                                2,
                                 angle
                             ));
                         }
@@ -1118,7 +1180,7 @@
             takeDamage() {
                 this.health--;
                 if (this.health <= 0) {
-                    return true; // Enemy destroyed
+                    return true;
                 }
                 return false;
             }
@@ -1128,7 +1190,6 @@
                 ctx.translate(this.x + this.width/2, this.y + this.height/2);
                 ctx.rotate(this.angle);
                 
-                // Different colors and shapes based on type
                 switch(this.type) {
                     case 'basic':
                         ctx.fillStyle = '#cc0000';
@@ -1136,10 +1197,9 @@
                         ctx.strokeStyle = '#ff0000';
                         break;
                     case 'zigzag':
-                        ctx.fillStyle = '#cc6600'; // Orange
+                        ctx.fillStyle = '#cc6600';
                         ctx.fillRect(-this.width/2, -this.height/2, this.width, this.height);
                         ctx.strokeStyle = '#ff8800';
-                        // Zigzag pattern on enemy
                         ctx.strokeStyle = '#ffaa00';
                         ctx.lineWidth = 2;
                         ctx.beginPath();
@@ -1149,17 +1209,15 @@
                         ctx.stroke();
                         break;
                     case 'tank':
-                        ctx.fillStyle = '#666600'; // Dark yellow
+                        ctx.fillStyle = '#666600';
                         ctx.fillRect(-this.width/2, -this.height/2, this.width, this.height);
                         ctx.strokeStyle = '#999900';
-                        // Tank tracks
                         ctx.fillStyle = '#333300';
                         ctx.fillRect(-this.width/2, -this.height/2 + 5, this.width, 5);
                         ctx.fillRect(-this.width/2, this.height/2 - 10, this.width, 5);
                         break;
                     case 'speedy':
-                        ctx.fillStyle = '#9900cc'; // Purple
-                        // Draw as diamond shape
+                        ctx.fillStyle = '#9900cc';
                         ctx.beginPath();
                         ctx.moveTo(0, -this.height/2);
                         ctx.lineTo(this.width/2, 0);
@@ -1170,8 +1228,7 @@
                         ctx.strokeStyle = '#cc00ff';
                         break;
                     case 'spiral':
-                        ctx.fillStyle = '#006666'; // Teal
-                        // Draw as hexagon
+                        ctx.fillStyle = '#006666';
                         ctx.beginPath();
                         for (let i = 0; i < 6; i++) {
                             const angle = (i * Math.PI / 3);
@@ -1189,7 +1246,6 @@
                 ctx.lineWidth = 2;
                 ctx.stroke();
                 
-                // Health indicator for multi-hit enemies
                 if (this.type === 'tank' && this.health < 3) {
                     ctx.fillStyle = '#ff0000';
                     for (let i = 0; i < (3 - this.health); i++) {
@@ -1197,7 +1253,6 @@
                     }
                 }
                 
-                // Enemy eyes (except for tank which has different design)
                 if (this.type !== 'tank') {
                     ctx.fillStyle = '#fff';
                     const eyeSize = Math.min(6, this.width * 0.15);
@@ -1276,32 +1331,32 @@
         });
 
         function resetGame() {
-            // Reset all game variables
             score = 0;
             lives = 3;
             level = 1;
             gameOver = false;
-            gameStarted = true; // 바로 시작되도록 변경
+            gameStarted = true;
             bullets = [];
             enemies = [];
             particles = [];
             lifeItems = [];
+            shieldItems = [];
             lastEnemySpawn = 0;
             lastLifeItemSpawn = 0;
+            lastShieldSpawnTime = 0;
             enemySpawnInterval = 2000;
             invulnerable = false;
             invulnerableTime = 0;
+            bossActive = false;
+            bosses = [];
             
-            // Reset player position
             player.x = canvas.width / 2 - 20;
             player.y = canvas.height - 80;
             
-            // Update UI
             scoreElement.textContent = score;
             livesElement.textContent = lives;
             levelElement.textContent = level;
             
-            // Start game immediately
             gameStartTime = Date.now();
             gameLoop();
         }
@@ -1316,16 +1371,13 @@
         function drawPlayer() {
             ctx.save();
             
-            // Apply invulnerability effect
             if (invulnerable && Math.floor(Date.now() / 100) % 2) {
                 ctx.globalAlpha = 0.5;
             }
             
-            // Player body (stick figure)
             const centerX = player.x + player.width / 2;
             const centerY = player.y + player.height / 2;
             
-            // Head
             ctx.fillStyle = '#FDBCB4';
             ctx.beginPath();
             ctx.arc(centerX, player.y + 12, 10, 0, Math.PI * 2);
@@ -1334,32 +1386,27 @@
             ctx.lineWidth = 2;
             ctx.stroke();
             
-            // Hair
             ctx.fillStyle = '#8B4513';
             ctx.beginPath();
             ctx.arc(centerX, player.y + 8, 11, Math.PI, 2 * Math.PI);
             ctx.fill();
             
-            // Eyes
             ctx.fillStyle = '#000';
             ctx.fillRect(centerX - 6, player.y + 8, 2, 2);
             ctx.fillRect(centerX + 4, player.y + 8, 2, 2);
             
-            // Body
             ctx.fillStyle = '#4169E1';
             ctx.fillRect(centerX - 8, player.y + 22, 16, 25);
             ctx.strokeStyle = '#000';
             ctx.lineWidth = 2;
             ctx.strokeRect(centerX - 8, player.y + 22, 16, 25);
             
-            // Arms
             ctx.fillStyle = '#FDBCB4';
             ctx.fillRect(centerX - 20, player.y + 28, 12, 6);
             ctx.fillRect(centerX + 8, player.y + 28, 12, 6);
             ctx.strokeRect(centerX - 20, player.y + 28, 12, 6);
             ctx.strokeRect(centerX + 8, player.y + 28, 12, 6);
             
-            // Legs
             ctx.fillStyle = '#2F4F4F';
             ctx.fillRect(centerX - 8, player.y + 47, 6, 13);
             ctx.fillRect(centerX + 2, player.y + 47, 6, 13);
@@ -1372,7 +1419,6 @@
         function updatePlayer() {
             let moveSpeed = player.speed;
             
-            // Diagonal movement normalization
             if ((keys.ArrowLeft || keys.ArrowRight) && (keys.ArrowUp || keys.ArrowDown)) {
                 moveSpeed *= 0.707;
             }
@@ -1382,7 +1428,6 @@
             if (keys.ArrowUp && player.y > 0) player.y -= moveSpeed;
             if (keys.ArrowDown && player.y < canvas.height - player.height) player.y += moveSpeed;
             
-            // Handle invulnerability
             if (invulnerable) {
                 if (Date.now() - invulnerableTime > 2000) {
                     invulnerable = false;
@@ -1390,32 +1435,32 @@
             }
         }
 
+        function spawnShieldItems() {
+            if (Date.now() - lastShieldSpawnTime > 19500) { // 15 seconds
+                shieldItems.push(new ShieldItem());
+                lastShieldSpawnTime = Date.now();
+            }
+        }
+
         function spawnEnemies() {
-            // Don't spawn regular enemies during boss fight
             if (bossActive) return;
             
             if (Date.now() - lastEnemySpawn > enemySpawnInterval) {
-                // Determine enemy type based on level (더 늦게 등장)
                 let enemyType = 'basic';
                 
                 if (level >= 25) {
-                    // Level 25+: All enemy types
-                    const types = ['basic', 'basic', 'zigzag', 'tank', 'speedy', 'spiral']; // basic 더 많이
+                    const types = ['basic', 'basic', 'zigzag', 'tank', 'speedy', 'spiral'];
                     enemyType = types[Math.floor(Math.random() * types.length)];
                 } else if (level >= 20) {
-                    // Level 20+: Add spiral enemies
                     const types = ['basic', 'basic', 'zigzag', 'tank', 'spiral'];
                     enemyType = types[Math.floor(Math.random() * types.length)];
                 } else if (level >= 15) {
-                    // Level 15+: Add speedy enemies
                     const types = ['basic', 'basic', 'zigzag', 'tank', 'speedy'];
                     enemyType = types[Math.floor(Math.random() * types.length)];
                 } else if (level >= 10) {
-                    // Level 10+: Add tank enemies
                     const types = ['basic', 'basic', 'zigzag', 'tank'];
                     enemyType = types[Math.floor(Math.random() * types.length)];
                 } else if (level >= 5) {
-                    // Level 5+: Add zigzag enemies
                     const types = ['basic', 'basic', 'zigzag'];
                     enemyType = types[Math.floor(Math.random() * types.length)];
                 }
@@ -1423,9 +1468,8 @@
                 enemies.push(new Enemy(enemyType));
                 lastEnemySpawn = Date.now();
                 
-                // 더 천천히 난이도 증가
                 if (enemySpawnInterval > 800) {
-                    enemySpawnInterval -= 20; // 더 천천히 감소
+                    enemySpawnInterval -= 20;
                 }
             }
         }
@@ -1436,17 +1480,14 @@
                 bossStartTime = Date.now();
                 bosses.push(new Boss());
                 
-                // Clear regular enemies for boss fight
                 enemies = [];
                 
-                // Boss warning sound
                 for (let i = 0; i < 3; i++) {
                     setTimeout(() => {
                         playSound(220 - i * 40, 0.5, 'triangle', 0.2);
                     }, i * 200);
                 }
                 
-                // Epic particles
                 for (let i = 0; i < 50; i++) {
                     particles.push(new Particle(
                         Math.random() * canvas.width,
@@ -1460,19 +1501,15 @@
         function updateBosses() {
             if (!bossActive) return;
             
-            // Boss duration: 5 seconds
             if (Date.now() - bossStartTime > 5000) {
-                // Boss disappears
                 bossActive = false;
                 bosses = [];
                 
-                // Reward player for surviving
                 score += 1000;
                 lives++;
                 livesElement.textContent = lives;
                 scoreElement.textContent = score;
                 
-                // Victory particles
                 for (let i = 0; i < 30; i++) {
                     particles.push(new Particle(
                         Math.random() * canvas.width,
@@ -1481,14 +1518,12 @@
                     ));
                 }
                 
-                // Victory sound
                 for (let i = 0; i < 5; i++) {
                     setTimeout(() => {
                         playSound(440 + i * 110, 0.3, 'sine', 0.1);
                     }, i * 100);
                 }
             } else {
-                // Update boss
                 bosses.forEach(boss => boss.update());
             }
         }
@@ -1501,19 +1536,16 @@
         }
 
         function updateLevel() {
-            const newLevel = Math.floor(score / 500) + 1; // 더 느린 레벨 진행
+            const newLevel = Math.floor(score / 500) + 1;
             if (newLevel > level) {
                 const oldLevel = level;
                 level = newLevel;
                 levelElement.textContent = level;
                 playLevelUpSound();
                 
-                // Check for boss spawn
                 spawnBoss();
                 
-                // Show special message for major level milestones
-                if (level % 5 === 0) { // 5레벨마다 특별 효과
-                    // Create special level up notification
+                if (level % 5 === 0) {
                     for (let i = 0; i < 20; i++) {
                         particles.push(new Particle(
                             Math.random() * canvas.width,
@@ -1525,7 +1557,6 @@
                         ));
                     }
                 } else {
-                    // Regular level up particles
                     for (let i = 0; i < 10; i++) {
                         particles.push(new Particle(
                             player.x + player.width/2,
@@ -1539,6 +1570,34 @@
 
         function checkCollisions() {
             if (invulnerable) return;
+
+            // Check shield item collisions
+            shieldItems.forEach((item, index) => {
+                const dx = item.x + item.width/2 - (player.x + player.width / 2);
+                const dy = item.y + item.height/2 - (player.y + player.height / 2);
+                if (Math.sqrt(dx * dx + dy * dy) < 30) {
+                    shieldItems.splice(index, 1);
+                    
+                    // Only activate shield if not already invulnerable
+                    if (!invulnerable) {
+                        invulnerable = true;
+                        invulnerableTime = Date.now();
+                        
+                        // Shield pickup sound
+                        playSound(880, 0.3, 'sine', 0.15);
+                        setTimeout(() => playSound(1320, 0.2, 'sine', 0.1), 100);
+                        
+                        // Shield pickup particles
+                        for (let i = 0; i < 15; i++) {
+                            particles.push(new Particle(
+                                item.x + item.width/2, 
+                                item.y + item.height/2, 
+                                '#00ffff'
+                            ));
+                        }
+                    }
+                }
+            });
             
             // Check bullet collisions with player
             bullets.forEach((bullet, bulletIndex) => {
@@ -1550,7 +1609,6 @@
                     bullets.splice(bulletIndex, 1);
                     takeDamage();
                     
-                    // Add explosion particles
                     for (let i = 0; i < 8; i++) {
                         particles.push(new Particle(bullet.x, bullet.y, '#ff4444'));
                     }
@@ -1573,13 +1631,12 @@
                 const dy = item.y + item.height/2 - (player.y + player.height / 2);
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
-                if (distance < 30) { // 조금 더 큰 충돌 범위
+                if (distance < 30) {
                     lifeItems.splice(itemIndex, 1);
                     lives++;
                     livesElement.textContent = lives;
                     playLifeItemSound();
                     
-                    // 더 많은 귀여운 파티클
                     for (let i = 0; i < 20; i++) {
                         particles.push(new Particle(
                             item.x + item.width/2, 
@@ -1588,7 +1645,6 @@
                         ));
                     }
                     
-                    // 추가 하트 파티클
                     for (let i = 0; i < 8; i++) {
                         particles.push(new Particle(
                             item.x + item.width/2 + (Math.random() - 0.5) * 40, 
@@ -1607,8 +1663,9 @@
                 bullet.y <= canvas.height + 50
             );
 
-            // Remove off-screen life items
+            // Remove off-screen life items and shield items
             lifeItems = lifeItems.filter(item => item.y <= canvas.height + 50);
+            shieldItems = shieldItems.filter(item => item.y <= canvas.height + 50);
 
             // Remove off-screen enemies and check collision with player
             enemies = enemies.filter(enemy => {
@@ -1622,9 +1679,7 @@
                     player.y < enemy.y + enemy.height &&
                     player.y + player.height > enemy.y) {
                     
-                    // Tank enemies take multiple hits
                     if (enemy.takeDamage()) {
-                        // Enemy destroyed, add explosion particles
                         for (let i = 0; i < 10; i++) {
                             particles.push(new Particle(
                                 enemy.x + enemy.width/2,
@@ -1635,7 +1690,7 @@
                     }
                     
                     takeDamage();
-                    return enemy.health > 0; // Remove if health is 0
+                    return enemy.health > 0;
                 }
 
                 return true;
@@ -1651,7 +1706,6 @@
             invulnerableTime = Date.now();
             playHitSound();
             
-            // Add damage particles
             for (let i = 0; i < 10; i++) {
                 particles.push(new Particle(
                     player.x + player.width/2,
@@ -1664,20 +1718,17 @@
                 gameOver = true;
                 playGameOverSound();
                 
-                // Update high score
                 if (score > highScore) {
                     highScore = score;
-                    try {
-                        localStorage.setItem('mahamanHighScore', highScore.toString());
-                    } catch (e) {
-                        // localStorage not available
-                    }
                 }
             }
         }
 
         function update() {
             if (!gameStarted || gameOver) return;
+
+            spawnShieldItems();
+            shieldItems.forEach(item => item.update());
             
             updatePlayer();
             spawnEnemies();
@@ -1685,19 +1736,11 @@
             updateLevel();
             updateBosses();
             
-            // Update bullets
             bullets.forEach(bullet => bullet.update());
-            
-            // Update enemies
             enemies.forEach(enemy => enemy.update());
-            
-            // Update bosses
             bosses.forEach(boss => boss.update());
-            
-            // Update life items
             lifeItems.forEach(item => item.update());
             
-            // Update particles
             particles = particles.filter(particle => {
                 particle.update();
                 return particle.life > 0;
@@ -1705,43 +1748,90 @@
             
             checkCollisions();
             
-            // Increase score
             score += 1;
             scoreElement.textContent = score;
         }
 
         function draw() {
-            // Clear canvas with dark night sky
             ctx.fillStyle = '#0a0a1a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Draw scrolling city background
             const time = Date.now() * 0.001;
-            const scrollSpeed = 30; // pixels per second
+            const scrollSpeed = 30;
             const backgroundOffset = (time * scrollSpeed) % canvas.height;
             
-            // Draw city pattern that repeats vertically
             drawCityBackground(backgroundOffset);
-            drawCityBackground(backgroundOffset - canvas.height); // Second copy for seamless loop
+            drawCityBackground(backgroundOffset - canvas.height);
+
+            // Draw shield items
+            shieldItems.forEach(item => item.draw());
+
+            // Shield visual effect
+            if (invulnerable) {
+                ctx.save();
+                ctx.translate(player.x + player.width/2, player.y + player.height/2);
+                
+                const time = Date.now() * 0.01;
+                const pulseScale = 1 + Math.sin(time * 0.3) * 0.1;
+                ctx.scale(pulseScale, pulseScale);
+                
+                // Multiple shield layers for depth
+                for (let layer = 0; layer < 3; layer++) {
+                    const radius = 35 + layer * 8;
+                    const alpha = (0.4 - layer * 0.1) * (0.7 + Math.sin(time + layer) * 0.3);
+                    
+                    // Hexagonal shield pattern
+                    ctx.globalAlpha = alpha;
+                    ctx.strokeStyle = layer === 0 ? '#00ffff' : 
+                                     layer === 1 ? '#66ccff' : '#aaeeff';
+                    ctx.lineWidth = 3 - layer;
+                    
+                    ctx.beginPath();
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i / 6) * Math.PI * 2 + time * 0.02;
+                        const x = Math.cos(angle) * radius;
+                        const y = Math.sin(angle) * radius;
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                }
+                
+                // Energy particles around shield
+                ctx.globalAlpha = 0.8;
+                for (let i = 0; i < 8; i++) {
+                    const particleAngle = (i / 8) * Math.PI * 2 + time * 0.05;
+                    const particleRadius = 45 + Math.sin(time * 0.1 + i) * 5;
+                    const particleX = Math.cos(particleAngle) * particleRadius;
+                    const particleY = Math.sin(particleAngle) * particleRadius;
+                    
+                    ctx.fillStyle = '#00ffff';
+                    ctx.beginPath();
+                    ctx.arc(particleX, particleY, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Central glow
+                ctx.globalAlpha = 0.2;
+                const centerGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 50);
+                centerGradient.addColorStop(0, '#00ffff');
+                centerGradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
+                ctx.fillStyle = centerGradient;
+                ctx.beginPath();
+                ctx.arc(0, 0, 50, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
             
             if (!gameStarted) return;
             
-            // Draw bosses
             bosses.forEach(boss => boss.draw());
-            
-            // Draw particles
             particles.forEach(particle => particle.draw());
-            
-            // Draw life items
             lifeItems.forEach(item => item.draw());
-            
-            // Draw player
             drawPlayer();
-            
-            // Draw bullets
             bullets.forEach(bullet => bullet.draw());
-            
-            // Draw enemies
             enemies.forEach(enemy => enemy.draw());
             
             if (gameOver) {
@@ -1751,27 +1841,23 @@
                 const survivalTime = gameStartTime ? Date.now() - gameStartTime : 0;
                 const isNewHighScore = score > highScore;
                 
-                // Game Over Title
                 ctx.fillStyle = isNewHighScore ? '#ff6b6b' : 'white';
                 ctx.font = 'bold 42px Arial';
                 ctx.textAlign = 'center';
                 ctx.fillText('Game Over!', canvas.width / 2, canvas.height / 2 - 120);
                 
-                // New High Score notification
                 if (isNewHighScore && score > 0) {
                     ctx.fillStyle = '#ffff00';
                     ctx.font = 'bold 24px Arial';
                     ctx.fillText('🎉 NEW HIGH SCORE! 🎉', canvas.width / 2, canvas.height / 2 - 80);
                 }
                 
-                // Score Board
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
                 ctx.fillRect(canvas.width / 2 - 150, canvas.height / 2 - 50, 300, 120);
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(canvas.width / 2 - 150, canvas.height / 2 - 50, 300, 120);
                 
-                // Score details
                 ctx.fillStyle = 'white';
                 ctx.font = 'bold 20px Arial';
                 ctx.fillText('📊 SCORE BOARD', canvas.width / 2, canvas.height / 2 - 25);
@@ -1781,12 +1867,10 @@
                 ctx.fillText(`Level: ${level}`, canvas.width / 2, canvas.height / 2 + 25);
                 ctx.fillText(`Time: ${formatTime(survivalTime)}`, canvas.width / 2, canvas.height / 2 + 50);
                 
-                // High Score
                 ctx.fillStyle = '#ffd700';
                 ctx.font = 'bold 16px Arial';
                 ctx.fillText(`🏆 High Score: ${highScore}`, canvas.width / 2, canvas.height / 2 + 85);
                 
-                // Restart button
                 const buttonY = canvas.height / 2 + 120;
                 const buttonWidth = 200;
                 const buttonHeight = 40;
@@ -1802,7 +1886,6 @@
                 ctx.font = 'bold 16px Arial';
                 ctx.fillText('🔄 다시 도전하시겠습니까?', canvas.width / 2, buttonY + 25);
                 
-                // Store button coordinates for click detection
                 canvas.restartButton = {
                     x: buttonX,
                     y: buttonY,
@@ -1816,21 +1899,18 @@
             ctx.save();
             ctx.translate(0, offsetY);
             
-            // Draw pixel art city skyline with irregular spacing
             const buildingColors = [
                 '#1a1a3a', '#2a2a4a', '#3a3a5a', '#1a2a4a', '#2a1a3a'
             ];
             
-            // Background buildings (far) - irregular spacing
             const bgBuildings = [0, 80, 140, 250, 320, 450, 520, 650, 720];
             bgBuildings.forEach((x, i) => {
                 if (x < canvas.width + 100) {
                     const height = 100 + (i % 3) * 40;
                     const width = 50 + (i % 2) * 20;
                     ctx.fillStyle = buildingColors[i % buildingColors.length];
-                    ctx.fillRect(x, canvas.height - height - 30, width, height); // Raised up for road space
+                    ctx.fillRect(x, canvas.height - height - 30, width, height);
                     
-                    // Fewer windows (30% chance)
                     if (Math.random() > 0.7) {
                         ctx.fillStyle = (i % 4 === 0) ? '#444466' : '#333355';
                         for (let wy = canvas.height - height - 30 + 25; wy < canvas.height - 45; wy += 25) {
@@ -1844,7 +1924,6 @@
                 }
             });
             
-            // Mid-ground buildings - more irregular
             const midBuildings = [30, 120, 200, 290, 380, 480, 580, 670];
             midBuildings.forEach((x, i) => {
                 if (x < canvas.width + 100) {
@@ -1853,7 +1932,6 @@
                     ctx.fillStyle = buildingColors[(i + 2) % buildingColors.length];
                     ctx.fillRect(x, canvas.height - height - 30, width, height);
                     
-                    // Even fewer windows (25% chance)
                     if (Math.random() > 0.75) {
                         ctx.fillStyle = (i % 3 === 0) ? '#555577' : '#444466';
                         for (let wy = canvas.height - height - 30 + 20; wy < canvas.height - 40; wy += 22) {
@@ -1865,7 +1943,6 @@
                         }
                     }
                     
-                    // Very rare rooftop details (10% chance)
                     if (Math.random() > 0.9) {
                         ctx.fillStyle = '#663333';
                         const antennaX = x + width/2 - 1;
@@ -1875,7 +1952,6 @@
                 }
             });
             
-            // Foreground buildings - very irregular spacing
             const fgBuildings = [15, 95, 180, 270, 350, 440, 530, 620, 710];
             fgBuildings.forEach((x, i) => {
                 if (x < canvas.width + 100) {
@@ -1884,7 +1960,6 @@
                     ctx.fillStyle = buildingColors[(i + 4) % buildingColors.length];
                     ctx.fillRect(x, canvas.height - height - 30, width, height);
                     
-                    // Minimal windows (20% chance)
                     if (Math.random() > 0.8) {
                         ctx.fillStyle = (i % 2 === 0) ? '#666688' : '#555577';
                         for (let wy = canvas.height - height - 30 + 15; wy < canvas.height - 38; wy += 20) {
@@ -1896,7 +1971,6 @@
                         }
                     }
                     
-                    // Very rare neon signs (5% chance)
                     if (Math.random() > 0.95) {
                         const time = Date.now() * 0.002;
                         const brightness = 0.3 + Math.sin(time + x) * 0.2;
@@ -1906,16 +1980,14 @@
                 }
             });
             
-            // Scattered small buildings
             const smallBuildings = [60, 160, 240, 330, 420, 500, 590, 680];
             smallBuildings.forEach((x, i) => {
-                if (x < canvas.width + 50 && Math.random() > 0.3) { // 70% chance to appear
+                if (x < canvas.width + 50 && Math.random() > 0.3) {
                     const height = 60 + (i % 3) * 20;
                     const width = 25 + (i % 2) * 10;
                     ctx.fillStyle = buildingColors[(i + 1) % buildingColors.length];
                     ctx.fillRect(x, canvas.height - height - 30, width, height);
                     
-                    // Rare single window
                     if (Math.random() > 0.85) {
                         ctx.fillStyle = '#444455';
                         ctx.fillRect(x + width/2 - 2, canvas.height - height - 30 + 15, 4, 5);
@@ -1923,46 +1995,36 @@
                 }
             });
             
-            // Draw road and sidewalk
             const roadY = canvas.height - 30;
             
-            // Main road
             ctx.fillStyle = '#2a2a2a';
             ctx.fillRect(0, roadY, canvas.width, 20);
             
-            // Road markings (dashed line)
             ctx.fillStyle = '#555555';
             for (let x = 0; x < canvas.width; x += 30) {
                 ctx.fillRect(x, roadY + 9, 15, 2);
             }
             
-            // Sidewalk
             ctx.fillStyle = '#3a3a3a';
             ctx.fillRect(0, roadY + 20, canvas.width, 10);
             
-            // Sidewalk edge
             ctx.fillStyle = '#555555';
             ctx.fillRect(0, roadY + 20, canvas.width, 1);
             
-            // Street lamps
             const lampPositions = [50, 150, 280, 400, 550, 680];
             lampPositions.forEach((x, i) => {
                 if (x < canvas.width) {
-                    // Lamp post
                     ctx.fillStyle = '#666666';
                     ctx.fillRect(x, roadY - 25, 3, 25);
                     
-                    // Lamp head
                     ctx.fillStyle = '#555555';
                     ctx.fillRect(x - 2, roadY - 30, 7, 5);
                     
-                    // Light glow (subtle)
                     const time = Date.now() * 0.001;
                     const flicker = 0.7 + Math.sin(time * 0.5 + i) * 0.1;
                     ctx.fillStyle = `rgba(255, 255, 200, ${flicker * 0.3})`;
                     ctx.fillRect(x - 1, roadY - 27, 5, 2);
                     
-                    // Light pool on ground
                     ctx.fillStyle = `rgba(255, 255, 150, ${flicker * 0.2})`;
                     ctx.fillRect(x - 8, roadY + 18, 16, 8);
                     ctx.fillStyle = `rgba(255, 255, 150, ${flicker * 0.1})`;
@@ -1970,7 +2032,6 @@
                 }
             });
             
-            // Fire hydrants
             const hydrantPositions = [120, 320, 520];
             hydrantPositions.forEach(x => {
                 if (x < canvas.width && Math.random() > 0.3) {
@@ -1980,7 +2041,6 @@
                 }
             });
             
-            // Trash cans
             const trashPositions = [200, 450, 650];
             trashPositions.forEach(x => {
                 if (x < canvas.width && Math.random() > 0.4) {
@@ -1991,7 +2051,6 @@
                 }
             });
             
-            // Small road debris/details
             for (let i = 0; i < 8; i++) {
                 const x = (i * 90 + 25) % canvas.width;
                 if (Math.random() > 0.7) {
@@ -2000,42 +2059,37 @@
                 }
             }
             
-            // Flying vehicles (reduced and slower)
             const time = Date.now() * 0.001;
-            for (let i = 0; i < 3; i++) { // Reduced from 5 to 3
-                const vehicleX = ((time * 25 + i * 200) % (canvas.width + 60)) - 30; // Slower
+            for (let i = 0; i < 3; i++) {
+                const vehicleX = ((time * 25 + i * 200) % (canvas.width + 60)) - 30;
                 const vehicleY = 80 + i * 80;
                 
-                if (Math.random() > 0.1) { // 90% chance to show
-                    // Vehicle body
+                if (Math.random() > 0.1) {
                     ctx.fillStyle = i % 2 === 0 ? '#444466' : '#446644';
                     ctx.fillRect(vehicleX, vehicleY, 12, 4);
                     
-                    // Dim vehicle lights
                     ctx.fillStyle = '#888888';
                     ctx.fillRect(vehicleX + 10, vehicleY + 1, 1, 1);
                     ctx.fillRect(vehicleX + 10, vehicleY + 2, 1, 1);
                 }
             }
             
-            // Minimal floating particles
-            for (let i = 0; i < 15; i++) { // Reduced from 30 to 15
+            for (let i = 0; i < 15; i++) {
                 const particleX = (i * 45) % canvas.width;
                 const particleY = ((time * 40 + i * 20) % (canvas.height + 40)) - 40;
                 
-                if (Math.random() > 0.3) { // 70% chance to show
+                if (Math.random() > 0.3) {
                     ctx.fillStyle = `rgba(120, 140, 180, ${0.2 + (i % 2) * 0.1})`;
                     ctx.fillRect(particleX, particleY, 1, 1);
                 }
             }
             
-            // Fewer, dimmer stars
-            for (let i = 0; i < 12; i++) { // Reduced from 20 to 12
+            for (let i = 0; i < 12; i++) {
                 const starX = (i * 60) % canvas.width;
                 const starY = i * 25;
-                const twinkle = 0.2 + Math.sin(time + i) * 0.3; // Dimmer
+                const twinkle = 0.2 + Math.sin(time + i) * 0.3;
                 
-                if (Math.random() > 0.4) { // 60% chance to show
+                if (Math.random() > 0.4) {
                     ctx.fillStyle = `rgba(200, 200, 220, ${twinkle})`;
                     ctx.fillRect(starX, starY, 1, 1);
                 }
@@ -2052,23 +2106,19 @@
             }
         }
 
-        // Load background image
         function loadBackgroundImage() {
             const startScreenElement = document.getElementById('startScreen');
-            // Create a dynamic background
             const canvas2d = document.createElement('canvas');
             const ctx2d = canvas2d.getContext('2d');
             canvas2d.width = 400;
             canvas2d.height = 600;
             
-            // Create a figure silhouette background
             const gradient = ctx2d.createLinearGradient(0, 0, 0, 600);
             gradient.addColorStop(0, '#1a1a2e');
             gradient.addColorStop(1, '#0f0f23');
             ctx2d.fillStyle = gradient;
             ctx2d.fillRect(0, 0, 400, 600);
             
-            // Add stars
             ctx2d.fillStyle = 'white';
             for (let i = 0; i < 100; i++) {
                 const x = Math.random() * 400;
@@ -2079,18 +2129,13 @@
                 ctx2d.fill();
             }
             
-            // Draw a heroic figure silhouette
             ctx2d.fillStyle = 'rgba(100, 150, 255, 0.3)';
             ctx2d.beginPath();
-            // Head
             ctx2d.arc(200, 200, 30, 0, Math.PI * 2);
             ctx2d.fill();
-            // Body
             ctx2d.fillRect(185, 230, 30, 80);
-            // Arms raised
             ctx2d.fillRect(150, 240, 35, 15);
             ctx2d.fillRect(215, 240, 35, 15);
-            // Legs
             ctx2d.fillRect(185, 310, 12, 50);
             ctx2d.fillRect(203, 310, 12, 50);
             
@@ -2098,7 +2143,6 @@
             startScreenElement.style.backgroundImage = `url(${imageUrl})`;
         }
 
-        // Load background when page loads
         window.addEventListener('load', () => {
             try {
                 loadBackgroundImage();
@@ -2107,7 +2151,6 @@
             }
         });
 
-        // Initial draw
         draw();
     </script>
 </body>
